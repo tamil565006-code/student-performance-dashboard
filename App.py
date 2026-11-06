@@ -93,8 +93,7 @@ art = train_models()
 # ---------- Header ----------
 st.title("🎓 Student Academic Performance Prediction")
 st.caption("Machine Learning project | Scikit-learn + Streamlit")
-st.warning("⚠️ All data in this app is SYNTHETIC (computer-generated for "
-           "demonstration). It does not describe real students.")
+st.caption("Dataset: simulated (synthetic) student data for demonstration.")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     ["📊 Dashboard", "🎯 Predict", "🗂️ Dataset",
