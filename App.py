@@ -114,7 +114,7 @@ if st.sidebar.button("Logout"):
 
 # Your existing ML code continues below
 (page_title="Student Performance Predictor",
-                   page_icon="🎓", layout="wide")
+                   page_icon=="🎓", layout="wide")
 
 FEATURES = ["Study_Hours", "Attendance", "Previous_Marks",
             "Assignment_Score", "Sleep_Hours", "Extra_Classes"]
