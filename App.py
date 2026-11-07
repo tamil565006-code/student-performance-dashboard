@@ -7,7 +7,103 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
-st.set_page_config(page_title="Student Performance Predictor",
+st.set_page_config()
+
+# ================= LOGIN PAGE =================
+
+import streamlit as st
+
+# Login CSS
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(135deg, #0f172a, #1e3a8a);
+}
+
+.login-box {
+    background: white;
+    padding: 35px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.login-title {
+    color: #1e40af;
+    font-size: 30px;
+    font-weight: bold;
+}
+
+.login-subtitle {
+    color: #64748b;
+}
+
+.stButton > button {
+    background: #2563eb;
+    color: white;
+    border-radius: 10px;
+    height: 45px;
+    width: 100%;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Session state
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+# Login screen
+if not st.session_state.logged_in:
+
+    left, center, right = st.columns([1, 1.2, 1])
+
+    with center:
+
+        st.markdown("""
+        <div class="login-box">
+            <div class="login-title">🎓 Student Portal</div>
+            <p class="login-subtitle">
+            Student Marks Prediction System
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.write("")
+
+        with st.form("login_form"):
+
+            username = st.text_input("Username")
+            password = st.text_input(
+                "Password",
+                type="password"
+            )
+
+            login_button = st.form_submit_button(
+                "Login",
+                use_container_width=True
+            )
+
+            if login_button:
+
+                if username == "admin" and password == "1234":
+                    st.session_state.logged_in = True
+                    st.rerun()
+
+                else:
+                    st.error("Invalid username or password")
+
+    st.stop()
+
+# ================= DASHBOARD AFTER LOGIN =================
+
+st.sidebar.success("Logged in successfully")
+
+if st.sidebar.button("Logout"):
+    st.session_state.logged_in = False
+    st.rerun()
+
+# Your existing ML code continues below
+(page_title="Student Performance Predictor",
                    page_icon="🎓", layout="wide")
 
 FEATURES = ["Study_Hours", "Attendance", "Previous_Marks",
