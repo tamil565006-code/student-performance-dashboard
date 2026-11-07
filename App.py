@@ -1,416 +1,229 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error, r2_score
 
+# ---------------- PAGE CONFIG ----------------
 st.set_page_config(
     page_title="Student Performance Predictor",
     page_icon="🎓",
     layout="wide"
 )
 
-# Your remaining existing code
-import numpy as np
-import pandas as pd
-import streamlit as st
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
-
-st.set_page_config()
-
-# ================= LOGIN PAGE =================
-
-import streamlit as st
-
-# Login CSS
+# ---------------- CSS ----------------
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(135deg, #0f172a, #1e3a8a);
+    background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 55%, #e0f2fe 100%);
 }
-
-.login-box {
-    background: white;
-    padding: 35px;
-    border-radius: 20px;
-    text-align: center;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+.block-container {padding-top: 1.5rem; padding-bottom: 2rem;}
+[data-testid="stSidebar"] {background: #e8edff;}
+.hero {
+    padding: 28px 24px; border-radius: 20px; color: white; text-align: center;
+    background: linear-gradient(120deg, #1d4ed8, #7c3aed);
+    box-shadow: 0 8px 25px rgba(37,99,235,.20); margin-bottom: 20px;
 }
-
-.login-title {
-    color: #1e40af;
-    font-size: 30px;
-    font-weight: bold;
+.hero h1 {color:white !important; margin-bottom:8px;}
+.panel {
+    background: white; padding: 20px; border-radius: 16px;
+    box-shadow: 0 4px 18px rgba(15,23,42,.08); margin-bottom: 16px;
 }
-
-.login-subtitle {
-    color: #64748b;
+div.stButton > button {
+    border-radius: 10px; border: 0; background: #2563eb; color: white;
+    font-weight: 600; min-height: 42px;
 }
-
-.stButton > button {
-    background: #2563eb;
-    color: white;
-    border-radius: 10px;
-    height: 45px;
-    width: 100%;
-}
+div.stButton > button:hover {background:#1d4ed8; color:white;}
 </style>
 """, unsafe_allow_html=True)
 
-# Session state
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+# ---------------- LOGIN STATE ----------------
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
 
-# Login screen
-if not st.session_state.logged_in:
+# Demo credentials: change these before using publicly.
+DEMO_USERNAME = "admin"
+DEMO_PASSWORD = "1234"
 
-    left, center, right = st.columns([1, 1.2, 1])
+# ---------------- LOGIN PAGE ----------------
+if not st.session_state.authenticated:
+    st.markdown("""
+    <div class="hero">
+      <h1>🎓 Student Performance Predictor</h1>
+      <p>Machine Learning • Student Academic Analytics</p>
+    </div>
+    """, unsafe_allow_html=True)
 
+    left, center, right = st.columns([1, 1.15, 1])
     with center:
-
-        st.markdown("""
-        <div class="login-box">
-            <div class="login-title">🎓 Student Portal</div>
-            <p class="login-subtitle">
-            Student Marks Prediction System
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.write("")
-
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown("### 🔐 Welcome back")
+        st.caption("Sign in to open your prediction dashboard.")
         with st.form("login_form"):
+            username = st.text_input("Username", placeholder="Enter username")
+            password = st.text_input("Password", type="password", placeholder="Enter password")
+            submitted = st.form_submit_button("Login", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-            username = st.text_input("Username")
-            password = st.text_input(
-                "Password",
-                type="password"
-            )
-
-            login_button = st.form_submit_button(
-                "Login",
-                use_container_width=True
-            )
-
-            if login_button:
-
-                if username == "admin" and password == "1234":
-                    st.session_state.logged_in = True
-                    st.rerun()
-
-                else:
-                    st.error("Invalid username or password")
-
+        if submitted:
+            if username == DEMO_USERNAME and password == DEMO_PASSWORD:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Incorrect username or password.")
+    st.info("Demo login: username `admin` · password `1234`")
     st.stop()
 
-# ================= DASHBOARD AFTER LOGIN =================
-
-st.sidebar.success("Logged in successfully")
-
-if st.sidebar.button("Logout"):
-    st.session_state.logged_in = False
-    st.rerun()
-
-# Your existing ML code continues below
-(page_title="Student Performance Predictor",
-                   page_icon=="🎓", layout="wide")
-
-FEATURES = ["Study_Hours", "Attendance", "Previous_Marks",
-            "Assignment_Score", "Sleep_Hours", "Extra_Classes"]
-TARGET = "Final_Marks"
-
-
-def get_category(marks):
-    if marks >= 75:
-        return "Excellent"
-    if marks >= 60:
-        return "Good"
-    if marks >= 50:
-        return "Average"
-    return "Needs Improvement"
-
-
-@st.cache_data
-def make_data(n=1000, seed=42):
-    # SYNTHETIC DATA: generated by a formula plus random noise
-    rng = np.random.default_rng(seed)
-    df = pd.DataFrame({
-        "Student_ID": [f"S{i:04d}" for i in range(1, n + 1)],
-        "Study_Hours": rng.uniform(0.5, 8, n).round(1),
-        "Attendance": rng.integers(50, 101, n),
-        "Previous_Marks": np.clip(rng.normal(65, 15, n), 20, 100).round(1),
-        "Assignment_Score": np.clip(rng.normal(70, 15, n), 10, 100).round(1),
-        "Sleep_Hours": rng.uniform(4, 10, n).round(1),
-        "Extra_Classes": rng.integers(0, 2, n),
-    })
-    noise = rng.normal(0, 4, n)
-    marks = (5 + 0.40 * df["Previous_Marks"] + 2.5 * df["Study_Hours"]
-             + 0.15 * df["Attendance"] + 0.12 * df["Assignment_Score"]
-             + 2 * df["Extra_Classes"]
-             - 1.2 * (df["Sleep_Hours"] - 7.5).abs() + noise)
-    df["Final_Marks"] = np.clip(marks, 0, 100).round(1)
-    df["Category"] = df["Final_Marks"].apply(get_category)
-    return df
-
-
-@st.cache_resource
-def train_models():
-    df = make_data()
-    X, y = df[FEATURES], df[TARGET]
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42)
-
-    models = {
-        "Linear Regression": LinearRegression(),
-        "Random Forest": RandomForestRegressor(n_estimators=200,
-                                               random_state=42),
-    }
-    rows, preds = [], {}
-    for name, model in models.items():
-        model.fit(X_train, y_train)
-        p = model.predict(X_test)
-        preds[name] = p
-        rows.append({
-            "Model": name,
-            "MAE": mean_absolute_error(y_test, p),
-            "RMSE": float(np.sqrt(mean_squared_error(y_test, p))),
-            "R2": r2_score(y_test, p),
-        })
-    results = pd.DataFrame(rows)
-    best_name = results.sort_values("R2", ascending=False).iloc[0]["Model"]
-    importance = pd.Series(models["Random Forest"].feature_importances_,
-                           index=FEATURES).sort_values(ascending=False)
-    compare = pd.DataFrame({"Actual": y_test.values,
-                            "Predicted": preds[best_name]})
-    return {
-        "best_model": models[best_name],
-        "best_name": best_name,
-        "results": results,
-        "importance": importance,
-        "compare": compare,
-        "n_train": len(X_train),
-        "n_test": len(X_test),
-    }
-
-
-df = make_data()
-art = train_models()
-
-# ---------- Header ----------
-st.title("🎓 Student Academic Performance Prediction")
-st.caption("Machine Learning project | Scikit-learn + Streamlit")
-st.caption("Dataset: simulated (synthetic) student data for demonstration.")
-
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["📊 Dashboard", "🎯 Predict", "🗂️ Dataset",
-     "📈 Model Performance", "ℹ️ About"])
-
-# ---------- Dashboard ----------
-with tab1:
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Students", f"{len(df):,}")
-    c2.metric("Average Marks", f"{df[TARGET].mean():.1f}")
-    c3.metric("Average Attendance", f"{df['Attendance'].mean():.1f}%")
-    c4.metric("Average and above",
-              f"{(df[TARGET] >= 50).mean() * 100:.1f}%")
-
-    left, right = st.columns(2)
-    with left:
-        st.subheader("Students by Performance Category")
-        order = ["Excellent", "Good", "Average", "Needs Improvement"]
-        counts = df["Category"].value_counts().reindex(order).fillna(0)
-        st.bar_chart(counts)
-    with right:
-        st.subheader("Average Final Marks by Study Hours")
-        by_hours = df.groupby(df["Study_Hours"].round())[TARGET].mean()
-        st.line_chart(by_hours)
-
-    st.subheader("Previous Marks vs Final Marks")
-    st.scatter_chart(df, x="Previous_Marks", y=TARGET)
-
-# ---------- Predict ----------
-with tab2:
-    st.subheader("Enter student details")
-    with st.form("predict_form"):
-        a, b = st.columns(2)
-        with a:
-            study = st.slider("Study hours per day", 0.5, 8.0, 4.0, 0.5)
-            attendance = st.slider("Attendance (%)", 50, 100, 80)
-            prev = st.slider("Previous exam marks", 20, 100, 65)
-        with b:
-            assign = st.slider("Assignment score", 10, 100, 70)
-            sleep = st.slider("Sleep hours per day", 4.0, 10.0, 7.0, 0.5)
-            extra = st.selectbox("Attends extra classes?", ["No", "Yes"])
-        submitted = st.form_submit_button("Predict Marks", type="primary")
-
-    if submitted:
-        row = pd.DataFrame([[study, attendance, prev, assign, sleep,
-                             1 if extra == "Yes" else 0]], columns=FEATURES)
-        pred = float(np.clip(art["best_model"].predict(row)[0], 0, 100))
-        category = get_category(pred)
-
-        r1, r2 = st.columns(2)
-        r1.metric("Predicted Final Marks", f"{pred:.1f} / 100")
-        r2.metric("Performance Category", category)
-        st.progress(int(round(pred)))
-
-        st.subheader("Suggestions")
-        tips = []
-        if study < 3:
-            tips.append("Increase daily study time to at least 3 hours.")
-        if attendance < 75:
-            tips.append("Improve attendance to 75% or more.")
-        if assign < 60:
-            tips.append("Submit assignments more carefully and on time.")
-        if sleep < 6 or sleep > 9:
-            tips.append("Aim for 7 to 8 hours of sleep.")
-        if not tips:
-            tips.append("Good habits. Keep the same routine.")
-        for t in tips:
-            st.write("• " + t)
-        st.caption("Prediction by " + art["best_name"] +
-                   " trained on synthetic data.")
-
-# ---------- Dataset ----------
-with tab3:
-    st.subheader("Synthetic Student Dataset")
-    st.caption("Generated with a fixed random seed (42). Not real data.")
-    st.dataframe(df)
-    st.download_button("Download dataset as CSV",
-                       data=df.to_csv(index=False).encode("utf-8"),
-                       file_name="student_performance_dataset.csv",
-                       mime="text/csv")
-    st.subheader("Summary statistics")
-    st.dataframe(df[FEATURES + [TARGET]].describe().round(2))
-
-# ---------- Model Performance ----------
-with tab4:
-    st.subheader("Evaluation Metrics (20% test set)")
-    st.caption(f"Training rows: {art['n_train']} | "
-               f"Test rows: {art['n_test']}")
-    st.dataframe(art["results"].round(3))
-    st.success("Best model (highest R2): " + art["best_name"])
-    st.markdown("**MAE** and **RMSE** are average errors in marks "
-                "(lower is better). **R2** shows how much of the variation "
-                "the model explains (closer to 1 is better).")
-
-    x1, x2 = st.columns(2)
-    with x1:
-        st.subheader("Feature Importance (Random Forest)")
-        st.bar_chart(art["importance"])
-    with x2:
-        st.subheader("Actual vs Predicted Marks")
-        st.scatter_chart(art["compare"], x="Actual", y="Predicted")
-
-# ---------- About ----------
-with tab5:
-    st.subheader("About this project")
-    st.write("This app predicts a student's final marks from study habits "
-             "and past results, then assigns a performance category.")
-    st.markdown(
-        "- **Data:** 1,000 synthetic records (not real students)\n"
-        "- **Models:** Linear Regression and Random Forest\n"
-        "- **Split:** 80% training, 20% testing\n"
-        "- **Categories:** Excellent (75+), Good (60-74), "
-        "Average (50-59), Needs Improvement (below 50)\n"
-        "- **Limitation:** The model learned a formula I wrote, so results "
-        "show the pipeline works, not how real students behave."
-    )
-
-# ================= CUSTOM HTML + CSS =================
+# ---------------- DASHBOARD HEADER / THREE DOT MENU ----------------
+with st.sidebar:
+    st.markdown("## ⋮ Menu")
+    st.caption("Student Performance")
+    page = st.radio("Navigate", ["Dashboard", "Predict Marks", "Dataset", "About"], label_visibility="collapsed")
+    st.divider()
+    if st.button("🚪 Logout", use_container_width=True):
+        st.session_state.authenticated = False
+        st.rerun()
 
 st.markdown("""
-<style>
-
-/* Main Background */
-.stApp {
-    background: linear-gradient(135deg, #e0f2fe, #f5f3ff);
-}
-
-/* Main Container */
-.block-container {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-}
-
-/* Main Title */
-.main-title {
-    background: linear-gradient(90deg, #1d4ed8, #7c3aed);
-    padding: 30px;
-    border-radius: 20px;
-    text-align: center;
-    color: white;
-    margin-bottom: 25px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-}
-
-.main-title h1 {
-    color: white !important;
-    font-size: 38px;
-}
-
-/* Cards */
-.custom-card {
-    background: white;
-    padding: 25px;
-    border-radius: 18px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-    margin-bottom: 20px;
-}
-
-.custom-card h3 {
-    color: #2563eb;
-}
-
-/* Buttons */
-.stButton > button {
-    background: linear-gradient(90deg, #2563eb, #7c3aed);
-    color: white;
-    border-radius: 10px;
-    border: none;
-    padding: 10px 25px;
-    font-weight: bold;
-}
-
-.stButton > button:hover {
-    background: #1d4ed8;
-    color: white;
-    border: none;
-}
-
-/* Input Fields */
-.stTextInput input,
-.stNumberInput input {
-    border-radius: 10px;
-}
-
-/* Slider */
-.stSlider {
-    color: #2563eb;
-}
-
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background: #eef2ff;
-}
-
-/* Metrics */
-[data-testid="stMetric"] {
-    background: white;
-    padding: 15px;
-    border-radius: 12px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-# ================= CUSTOM HTML HEADER =================
-
-st.markdown("""
-<div class="main-title">
-    <h1>🎓 Student Marks Prediction</h1>
-    <p>Machine Learning Based Student Performance Analysis</p>
+<div class="hero">
+  <h1>🎓 Student Performance Dashboard</h1>
+  <p>Explore student data and predict academic marks with Machine Learning</p>
 </div>
 """, unsafe_allow_html=True)
+
+# ---------------- DATASET ----------------
+st.sidebar.markdown("### 📁 Dataset")
+uploaded = st.sidebar.file_uploader("Upload student CSV", type=["csv"])
+
+@st.cache_data
+def load_default_data():
+    # Synthetic fallback dataset so the app can run even without a CSV.
+    rng = np.random.default_rng(42)
+    n = 500
+    study_hours = rng.uniform(0, 10, n)
+    attendance = rng.uniform(50, 100, n)
+    previous_marks = rng.uniform(30, 100, n)
+    sleep_hours = rng.uniform(4, 9, n)
+    noise = rng.normal(0, 7, n)
+    final_marks = np.clip(
+        5 + study_hours * 4.2 + attendance * .25 + previous_marks * .35
+        + sleep_hours * 1.2 + noise, 0, 100
+    )
+    return pd.DataFrame({
+        "Study_Hours": study_hours.round(1),
+        "Attendance": attendance.round(1),
+        "Previous_Marks": previous_marks.round(1),
+        "Sleep_Hours": sleep_hours.round(1),
+        "Final_Marks": final_marks.round(1)
+    })
+
+if uploaded is not None:
+    try:
+        df = pd.read_csv(uploaded)
+        st.sidebar.success(f"Loaded {len(df)} rows")
+    except Exception as e:
+        st.error(f"Could not read CSV: {e}")
+        df = load_default_data()
+else:
+    df = load_default_data()
+    st.sidebar.info("Using demo synthetic data")
+
+# ---------------- MODEL PREPARATION ----------------
+# Select target and numeric features. Prefer Final_Marks if present.
+target_candidates = ["Final_Marks", "final_marks", "G3", "Marks", "Score", "score"]
+target = next((c for c in target_candidates if c in df.columns), None)
+
+numeric_df = df.select_dtypes(include=np.number).copy()
+if target is None or target not in numeric_df.columns:
+    # If uploaded data has no known target, use the last numeric column as target.
+    if numeric_df.shape[1] >= 2:
+        target = numeric_df.columns[-1]
+    else:
+        target = None
+
+if target is not None and numeric_df.shape[1] >= 2:
+    model_data = numeric_df.dropna(subset=[target])
+    features = [c for c in model_data.columns if c != target]
+    X = model_data[features].fillna(model_data[features].median())
+    y = model_data[target]
+    if len(model_data) >= 10 and len(features) > 0:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
+        model = RandomForestRegressor(n_estimators=150, random_state=42)
+        model.fit(X_train, y_train)
+        predictions = model.predict(X_test)
+        mae = mean_absolute_error(y_test, predictions)
+        r2 = r2_score(y_test, predictions) if len(y_test) > 1 else np.nan
+    else:
+        model = None
+        features = []
+        mae = np.nan
+        r2 = np.nan
+else:
+    model = None
+    features = []
+    mae = np.nan
+    r2 = np.nan
+
+# ---------------- PAGES ----------------
+if page == "Dashboard":
+    st.markdown("### 📊 Dataset overview")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Student records", f"{len(df):,}")
+    c2.metric("Numeric columns", numeric_df.shape[1])
+    c3.metric("Prediction target", target if target else "Not found")
+    if model is not None:
+        c4, c5 = st.columns(2)
+        c4.metric("Mean Absolute Error (MAE)", f"{mae:.2f}")
+        c5.metric("R² score", f"{r2:.3f}" if pd.notna(r2) else "N/A")
+    st.markdown("#### Dataset preview")
+    st.dataframe(df.head(20), use_container_width=True)
+    if target and target in df.columns:
+        st.markdown("#### Marks distribution")
+        st.bar_chart(df[target].dropna())
+
+elif page == "Predict Marks":
+    st.markdown("### 🤖 Predict student performance")
+    if model is None:
+        st.warning("Please upload a CSV with at least 10 rows and 2 numeric columns (one target column).")
+    else:
+        st.caption(f"Model target: **{target}**. Enter values for the numeric input features.")
+        input_values = {}
+        cols = st.columns(2)
+        for i, feature in enumerate(features):
+            series = X[feature]
+            default = float(series.median())
+            min_val = float(series.min())
+            max_val = float(series.max())
+            # Avoid identical min/max values in widgets.
+            if min_val == max_val:
+                max_val = min_val + 1.0
+            with cols[i % 2]:
+                input_values[feature] = st.number_input(
+                    feature, min_value=min_val, max_value=max_val,
+                    value=min(max(default, min_val), max_val), key=f"input_{feature}"
+                )
+        if st.button("✨ Predict Marks", use_container_width=True):
+            new_data = pd.DataFrame([input_values], columns=features)
+            predicted = float(model.predict(new_data)[0])
+            st.success(f"Predicted {target}: {predicted:.2f}")
+            st.metric("Predicted score", f"{predicted:.2f}")
+
+elif page == "Dataset":
+    st.markdown("### 📁 Full dataset")
+    st.dataframe(df, use_container_width=True)
+    st.download_button("Download loaded dataset as CSV", df.to_csv(index=False), "student_dataset.csv", "text/csv")
+
+elif page == "About":
+    st.markdown("""
+    ### ℹ️ About this project
+    **Student Performance Prediction** uses a Random Forest regression model
+    to estimate a numeric student score from other numeric dataset columns.
+
+    - Upload your own CSV from the sidebar.
+    - The app selects `Final_Marks`, `G3`, `Marks`, or `Score` as target if available.
+    - Otherwise, it uses the last numeric column as target.
+    - This demo login is not secure production authentication.
+    """)
