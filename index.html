@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student Academic Performance Prediction</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>🎓 Student Academic Performance Prediction</h1>
+  <p>Machine Learning project | Intern Spot Innovations Private Limited</p>
+</header>
+<main>
+  <section class="card">
+    <h2>1. Load dataset</h2>
+    <input type="file" id="file" accept=".csv">
+    <p class="note" id="info">Choose a CSV file with a marks column and numeric input columns.</p>
+  </section>
+
+  <section class="card hidden" id="setup">
+    <h2>2. Settings</h2>
+    <label>Target column (marks to predict)
+      <select id="target"></select></label>
+    <label>Maximum possible marks
+      <input type="number" id="top" value="100" min="1"></label>
+    <p class="label">Input features</p>
+    <div id="features" class="chips"></div>
+    <button id="train">Train model</button>
+  </section>
+
+  <section class="card hidden" id="results">
+    <h2>3. Model performance (20% test set)</h2>
+    <div class="grid" id="metrics"></div>
+    <h3>Feature importance</h3>
+    <div id="bars"></div>
+    <p class="note" id="split"></p>
+  </section>
+
+  <section class="card hidden" id="predict">
+    <h2>4. Predict marks</h2>
+    <div class="grid" id="form"></div>
+    <button id="go">Predict marks</button>
+    <div id="out" class="out hidden">
+      <div class="big" id="pred"></div>
+      <div class="cat" id="cat"></div>
+      <div class="bar"><div id="fill"></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>About</h2>
+    <p>Categories (share of maximum marks): Excellent 75%+, Good 60–74%, Average 50–59%, Needs Improvement below 50%. The model is Linear Regression trained in your browser; your data never leaves your device. Results depend on the dataset quality.</p>
+  </section>
+</main>
+<footer>Tamil Vanan E | B.E. Artificial Intelligence and Data Science</footer>
+<script src="script.js"></script>
+</body>
+</html>
