@@ -211,3 +211,100 @@ with tab5:
         "- **Limitation:** The model learned a formula I wrote, so results "
         "show the pipeline works, not how real students behave."
     )
+
+# ================= CUSTOM HTML + CSS =================
+
+st.markdown("""
+<style>
+
+/* Main Background */
+.stApp {
+    background: linear-gradient(135deg, #e0f2fe, #f5f3ff);
+}
+
+/* Main Container */
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+/* Main Title */
+.main-title {
+    background: linear-gradient(90deg, #1d4ed8, #7c3aed);
+    padding: 30px;
+    border-radius: 20px;
+    text-align: center;
+    color: white;
+    margin-bottom: 25px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.main-title h1 {
+    color: white !important;
+    font-size: 38px;
+}
+
+/* Cards */
+.custom-card {
+    background: white;
+    padding: 25px;
+    border-radius: 18px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+}
+
+.custom-card h3 {
+    color: #2563eb;
+}
+
+/* Buttons */
+.stButton > button {
+    background: linear-gradient(90deg, #2563eb, #7c3aed);
+    color: white;
+    border-radius: 10px;
+    border: none;
+    padding: 10px 25px;
+    font-weight: bold;
+}
+
+.stButton > button:hover {
+    background: #1d4ed8;
+    color: white;
+    border: none;
+}
+
+/* Input Fields */
+.stTextInput input,
+.stNumberInput input {
+    border-radius: 10px;
+}
+
+/* Slider */
+.stSlider {
+    color: #2563eb;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background: #eef2ff;
+}
+
+/* Metrics */
+[data-testid="stMetric"] {
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ================= CUSTOM HTML HEADER =================
+
+st.markdown("""
+<div class="main-title">
+    <h1>🎓 Student Marks Prediction</h1>
+    <p>Machine Learning Based Student Performance Analysis</p>
+</div>
+""", unsafe_allow_html=True)
