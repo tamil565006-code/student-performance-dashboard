@@ -1,4 +1,10 @@
+import streamlit as st
 
+st.set_page_config(
+    page_title="Student Performance Prediction",
+    page_icon="🎓",
+    layout="wide"
+)
 import numpy as np
 import pandas as pd
 import streamlit as st
