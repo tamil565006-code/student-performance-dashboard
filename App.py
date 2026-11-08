@@ -1,163 +1,186 @@
-import streamlit as st
+ import numpy as np
 import pandas as pd
-import numpy as np
+import streamlit as st
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, r2_score
 
-st.set_page_config(page_title="Student Academic Performance Prediction", page_icon="🎓", layout="wide")
+st.set_page_config(page_title="Student Academic Performance Prediction", page_icon="🎓", layout="centered")
 
-# --------- CSS ---------
-st.markdown("""
-<style>
-.block-container{padding-top:1.2rem;padding-bottom:2rem}
-.stApp{background:linear-gradient(180deg,#ffffff 0%,#f3f7ff 55%,#e4f5ff 100%)}
-.hero{background:linear-gradient(110deg,#254be8,#8737ee);color:white;text-align:center;padding:28px 18px;border-radius:0 0 28px 28px;margin-bottom:20px}
-.hero h1{color:white!important;font-size:clamp(26px,5vw,48px);margin:0 0 12px}
-.hero p{color:#f0edff;font-size:clamp(14px,2vw,19px);margin:7px 0}
-.card{background:rgba(255,255,255,.88);border:1px solid #e0e5ef;border-radius:18px;padding:20px;margin:12px 0;box-shadow:0 5px 18px rgba(30,64,175,.06)}
-div.stButton>button{border-radius:10px;min-height:42px;font-weight:600}
-[data-testid="stSidebar"]{background:#edf2ff}
-</style>
-""", unsafe_allow_html=True)
+FEATURES = ["study_hours", "attendance", "previous_marks", "sleep_hours"]
 
-# --------- LOGIN ---------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if not st.session_state.logged_in:
-    st.markdown("""<div class="hero"><h1>🎓 Student Academic Performance Prediction</h1>
-    <p>Machine Learning project | Scikit-learn + Streamlit</p></div>""", unsafe_allow_html=True)
-    _, mid, _ = st.columns([1,1.2,1])
-    with mid:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("## 🔐 Welcome back")
-        st.write("Sign in to open your prediction dashboard.")
-        with st.form("login"):
-            username=st.text_input("Username",placeholder="admin")
-            password=st.text_input("Password",type="password")
-            login=st.form_submit_button("Login",use_container_width=True)
-        st.markdown("</div>",unsafe_allow_html=True)
-        if login:
-            if username.strip()=="admin" and password=="1234":
-                st.session_state.logged_in=True
-                st.rerun()
-            else:
-                st.error("Incorrect username or password")
-    st.info("Demo login: username **admin** · password **1234**")
+
+# ---------------------------------------------------------------- AUTH
+def get_users() -> dict:
+    """Users from Streamlit secrets ([users] section) or a demo fallback."""
+    try:
+        return dict(st.secrets["users"])
+    except Exception:
+        return {"admin": "admin123"}  # demo only - change this!
+
+
+def login_page():
+    st.title("🔐 Login")
+    st.caption("Sign in to use the Student Performance app.")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Login", type="primary"):
+        users = get_users()
+        if username in users and str(users[username]) == password:
+            st.session_state["user"] = username
+            st.rerun()
+        else:
+            st.error("Invalid username or password")
+
+
+if "user" not in st.session_state:
+    login_page()
     st.stop()
 
-# --------- SIDEBAR / THREE DOT MENU ---------
-with st.sidebar:
-    st.markdown("## ⋮ Menu")
-    tab=st.radio("Pages",["Dashboard","Predict","Dataset","Model Performance"],label_visibility="collapsed")
-    st.divider()
-    if st.button("Logout",use_container_width=True):
-        st.session_state.logged_in=False
-        st.rerun()
-    st.markdown("### 📂 Dataset")
-    upload=st.file_uploader("Upload CSV",type=["csv"])
 
-# --------- DATA ---------
+# ---------------------------------------------------------------- DATA + MODEL
 @st.cache_data
-def synthetic_data():
-    rng=np.random.default_rng(42)
-    n=500
-    study=rng.uniform(0,10,n)
-    attend=rng.uniform(50,100,n)
-    previous=rng.uniform(30,100,n)
-    sleep=rng.uniform(4,9,n)
-    final=np.clip(5+study*4.2+attend*.25+previous*.35+sleep*1.2+rng.normal(0,7,n),0,100)
-    return pd.DataFrame({"Study_Hours":study.round(1),"Attendance":attend.round(1),
-                         "Previous_Marks":previous.round(1),"Sleep_Hours":sleep.round(1),
-                         "Final_Marks":final.round(1)})
-if upload is not None:
-    try: df=pd.read_csv(upload)
-    except Exception as e:
-        st.error(f"CSV could not be loaded: {e}")
-        df=synthetic_data()
-else: df=synthetic_data()
+def make_data(n: int = 1000, seed: int = 42) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    study = rng.uniform(0, 10, n).round(2)
+    attendance = rng.integers(40, 101, n)
+    previous = rng.integers(30, 101, n)
+    sleep = rng.uniform(4, 9, n).round(1)
+    final = (
+        4.0 * study
+        + 0.25 * attendance
+        + 0.40 * previous
+        + 1.0 * sleep
+        + rng.normal(0, 4, n)
+    )
+    final = np.clip(final, 0, 100).round(1)
+    return pd.DataFrame(
+        {
+            "study_hours": study,
+            "attendance": attendance,
+            "previous_marks": previous,
+            "sleep_hours": sleep,
+            "final_score": final,
+        }
+    )
 
-# target/model
-num=df.select_dtypes(include=np.number).copy()
-candidates=["Final_Marks","final_marks","G3","Marks","Score","score"]
-target=next((x for x in candidates if x in num.columns),num.columns[-1] if num.shape[1]>=2 else None)
-model=None; features=[]; mae=np.nan; r2=np.nan; X=pd.DataFrame()
-if target and num.shape[1]>=2:
-    clean=num.dropna(subset=[target])
-    features=[x for x in clean.columns if x!=target]
-    X=clean[features].fillna(clean[features].median()); y=clean[target]
-    if len(clean)>=10 and features:
-        xtr,xte,ytr,yte=train_test_split(X,y,test_size=.2,random_state=42)
-        model=RandomForestRegressor(n_estimators=150,random_state=42).fit(xtr,ytr)
-        pred=model.predict(xte); mae=mean_absolute_error(yte,pred); r2=r2_score(yte,pred)
 
-# --------- HEADER ---------
-st.markdown("""<div class="hero">
-<h1>🎓 Student Academic Performance Prediction</h1>
-<p>Machine Learning project | Scikit-learn + Streamlit</p>
-<p>Dataset: student performance records for academic analysis.</p>
-</div>""",unsafe_allow_html=True)
+@st.cache_resource
+def train_model(df: pd.DataFrame):
+    X, y = df[FEATURES], df["final_score"]
+    X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, random_state=42)
+    model = RandomForestRegressor(n_estimators=200, random_state=42)
+    model.fit(X_tr, y_tr)
+    pred = model.predict(X_te)
+    metrics = {
+        "R²": r2_score(y_te, pred),
+        "MAE": mean_absolute_error(y_te, pred),
+        "RMSE": float(np.sqrt(mean_squared_error(y_te, pred))),
+    }
+    return model, metrics, y_te.reset_index(drop=True), pd.Series(pred)
 
-# horizontal navigation-like tabs
-t1,t2,t3,t4=st.tabs(["📊 Dashboard","🎯 Predict","📁 Dataset","📈 Model Performance"])
 
-# --------- DASHBOARD ---------
-with t1:
-    st.markdown("## 📊 Dataset overview")
-    a,b,c,d=st.columns(4)
-    a.metric("Student records",len(df))
-    b.metric("Numeric columns",num.shape[1])
-    c.metric("Prediction target",target or "Not found")
-    d.metric("Model", "Random Forest" if model else "Not trained")
-    st.markdown('<div class="card">',unsafe_allow_html=True)
-    st.subheader("Dataset preview")
-    st.dataframe(df.head(15),use_container_width=True)
-    st.markdown("</div>",unsafe_allow_html=True)
-    if target and target in df:
-        st.subheader("Marks distribution")
-        st.bar_chart(df[target].dropna())
+def grade(score: float) -> str:
+    if score >= 85:
+        return "A"
+    if score >= 70:
+        return "B"
+    if score >= 55:
+        return "C"
+    if score >= 40:
+        return "D"
+    return "F"
 
-# --------- PREDICT ---------
-with t2:
-    st.markdown("## Enter student details")
-    if model is None:
-        st.warning("Upload a CSV with at least 10 rows and 2 numeric columns to train the model.")
-    else:
-        vals={}
-        # use screenshot's familiar fields where present; any other feature gets a numeric input
-        st.markdown('<div class="card">',unsafe_allow_html=True)
-        for feature in features:
-            s=X[feature]; lo=float(s.min()); hi=float(s.max()); default=float(np.clip(s.median(),lo,hi))
-            key=feature.lower()
-            if "study" in key and ("hour" in key or "time" in key):
-                vals[feature]=st.slider("Study hours per day",0.0,12.0,float(np.clip(default,0,12)),step=.5)
-            elif "attendance" in key:
-                vals[feature]=st.slider("Attendance (%)",0.0,100.0,float(np.clip(default,0,100)),step=1.0)
-            elif "previous" in key and ("mark" in key or "score" in key or "grade" in key):
-                vals[feature]=st.slider("Previous exam marks",0.0,100.0,float(np.clip(default,0,100)),step=1.0)
-            elif "sleep" in key:
-                vals[feature]=st.slider("Sleep hours",0.0,12.0,float(np.clip(default,0,12)),step=.5)
-            else:
-                if lo==hi: hi=lo+1
-                vals[feature]=st.number_input(feature,min_value=lo,max_value=hi,value=float(np.clip(default,lo,hi)))
-        st.markdown("</div>",unsafe_allow_html=True)
-        if st.button("🔮 Predict Marks",use_container_width=True):
-            result=float(model.predict(pd.DataFrame([vals],columns=features))[0])
-            st.success(f"Predicted {target}: {result:.2f}")
-            st.metric("Predicted marks",f"{result:.2f}/100")
 
-# --------- DATASET ---------
-with t3:
-    st.markdown("## 📁 Dataset")
-    st.dataframe(df,use_container_width=True)
-    st.download_button("Download CSV",df.to_csv(index=False),"student_dataset.csv","text/csv")
+df = make_data()
+model, metrics, y_test, y_pred = train_model(df)
 
-# --------- MODEL PERFORMANCE ---------
-with t4:
-    st.markdown("## 📈 Model Performance")
-    if model is None: st.warning("Model is not trained. Upload a valid CSV.")
-    else:
-        a,b=st.columns(2); a.metric("Mean Absolute Error (MAE)",f"{mae:.2f}"); b.metric("R² Score",f"{r2:.3f}")
-        st.subheader("Feature importance")
-        imp=pd.DataFrame({"Feature":features,"Importance":model.feature_importances_}).sort_values("Importance",ascending=False)
-        st.bar_chart(imp.set_index("Feature"))
+# ---------------------------------------------------------------- SIDEBAR
+st.sidebar.write(f"👤 Signed in as **{st.session_state['user']}**")
+if st.sidebar.button("Logout"):
+    del st.session_state["user"]
+    st.rerun()
+
+# ---------------------------------------------------------------- HEADER
+st.title("🎓 Student Academic Performance Prediction")
+st.caption("Machine Learning project | Scikit-learn + Streamlit")
+st.caption("Dataset: simulated (synthetic) student data for demonstration.")
+
+tab_dash, tab_pred, tab_data, tab_model = st.tabs(
+    ["📊 Dashboard", "🎯 Predict", "🗂️ Dataset", "📈 Model Performance"]
+)
+
+# ---------------------------------------------------------------- DASHBOARD
+with tab_dash:
+    st.header("Overview")
+    c1, c2 = st.columns(2)
+    c1.metric("Students", len(df))
+    c2.metric("Average score", f"{df['final_score'].mean():.1f}")
+    c3, c4 = st.columns(2)
+    c3.metric("Avg study hrs/day", f"{df['study_hours'].mean():.1f}")
+    c4.metric("Avg attendance", f"{df['attendance'].mean():.0f}%")
+
+    st.subheader("Average score by study hours")
+    bins = pd.cut(df["study_hours"], bins=[0, 2, 4, 6, 8, 10], include_lowest=True)
+    by_hours = df.groupby(bins, observed=True)["final_score"].mean()
+    by_hours.index = by_hours.index.astype(str)
+    st.bar_chart(by_hours)
+
+    st.subheader("Grade distribution")
+    grades = df["final_score"].apply(grade).value_counts().reindex(list("ABCDF"), fill_value=0)
+    st.bar_chart(grades)
+
+# ---------------------------------------------------------------- PREDICT
+with tab_pred:
+    st.header("Enter student details")
+    with st.container(border=True):
+        study_hours = st.slider("Study hours per day", 0.0, 10.0, 4.0, 0.25)
+        attendance = st.slider("Attendance (%)", 0, 100, 80)
+        previous_marks = st.slider("Previous exam marks", 0, 100, 65)
+        sleep_hours = st.slider("Sleep hours per day", 4.0, 10.0, 7.0, 0.5)
+
+    if st.button("🎯 Predict score", type="primary"):
+        row = pd.DataFrame(
+            [[study_hours, attendance, previous_marks, sleep_hours]], columns=FEATURES
+        )
+        score = float(np.clip(model.predict(row)[0], 0, 100))
+        g = grade(score)
+        st.success(f"Predicted final score: **{score:.1f} / 100**  |  Grade: **{g}**")
+        st.progress(int(score))
+        if g in ("D", "F"):
+            st.warning("At risk: consider more study time and better attendance.")
+        elif g in ("A", "B"):
+            st.info("Great! Keep up the current habits.")
+
+# ---------------------------------------------------------------- DATASET
+with tab_data:
+    st.header("Dataset")
+    st.dataframe(df, use_container_width=True, height=350)
+    st.download_button(
+        "⬇️ Download CSV",
+        df.to_csv(index=False).encode("utf-8"),
+        file_name="student_data.csv",
+        mime="text/csv",
+    )
+    st.subheader("Summary statistics")
+    st.dataframe(df.describe().round(2), use_container_width=True)
+
+# ---------------------------------------------------------------- MODEL PERFORMANCE
+with tab_model:
+    st.header("Model performance")
+    st.caption("Random Forest Regressor | 80/20 train-test split")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("R²", f"{metrics['R²']:.3f}")
+    m2.metric("MAE", f"{metrics['MAE']:.2f}")
+    m3.metric("RMSE", f"{metrics['RMSE']:.2f}")
+
+    st.subheader("Feature importance")
+    imp = pd.Series(model.feature_importances_, index=FEATURES).sort_values(ascending=False)
+    st.bar_chart(imp)
+
+    st.subheader("Actual vs predicted")
+    st.scatter_chart(pd.DataFrame({"Actual": y_test, "Predicted": y_pred}), x="Actual", y="Predicted")
+
+
+
+                         
